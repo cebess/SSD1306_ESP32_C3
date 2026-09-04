@@ -1,4 +1,4 @@
-This project is to demonstrate the capabilities of the SSD1306, 128 x 64 Dot Matrix, OLED/PLED Segment/Common Driver with Controller to 
+This project (SSD1306_ESP32_C3) is to demonstrate the capabilities of the SSD1306, 128 x 64 Dot Matrix, OLED/PLED Segment/Common Driver with Controller to 
 the ESP32-C3.
 
 ## Wiring
