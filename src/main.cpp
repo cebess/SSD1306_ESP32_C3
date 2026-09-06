@@ -18,17 +18,12 @@
 #define FRAME_DELAY_MS 50
 #define MAX_FOLDERS 16
 #define EMOTIONS_DIR "/emotions"
+#define EYE_MOVEMENT_DIR "/eye_movement"
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 char frameNames[MAX_FRAMES][64];
 int frameCount = 0;
-
-char folderNames[MAX_FOLDERS][64];
-int folderCount = 0;
-
-char emotionNames[MAX_FOLDERS][64];
-int emotionCount = 0;
 
 uint16_t readLE16(File &f) {
   uint16_t lsb = f.read();
@@ -206,40 +201,42 @@ int loadSubfolderList(const char *parentPath, char list[][64], int maxCount) {
   return count;
 }
 
-// Builds the list of top-level frame folders found in LittleFS's root (excluding the emotions container).
-void loadFolderList() {
-  folderCount = loadSubfolderList("/", folderNames, MAX_FOLDERS);
+// Returns a random subfolder path from the specified parent folder (e.g. "/eye_movement" or "/emotions"), or nullptr if none exist.
+const char *getRandomEyeMovement(const char *folderPath) {
+  static char selectedFolder[64];
+  char subfolders[MAX_FOLDERS][64];
 
-  for (int i = 0; i < folderCount; i++) {
-    if (strcmp(folderNames[i], EMOTIONS_DIR) == 0) {
-      for (int j = i; j < folderCount - 1; j++) {
-        strcpy(folderNames[j], folderNames[j + 1]);
-      }
-      folderCount--;
-      break;
+  // Normalize path for LittleFS (strip "data/" prefix if provided and convert backslashes)
+  char cleanPath[64];
+  const char *p = folderPath;
+  if (strncmp(p, "data/", 5) == 0 || strncmp(p, "data\\", 5) == 0) {
+    p += 4;
+  } else if (strncmp(p, "/data/", 6) == 0 || strncmp(p, "\\data\\", 6) == 0) {
+    p += 5;
+  }
+
+  if (p[0] != '/' && p[0] != '\\') {
+    snprintf(cleanPath, sizeof(cleanPath), "/%s", p);
+  } else {
+    strncpy(cleanPath, p, sizeof(cleanPath) - 1);
+    cleanPath[sizeof(cleanPath) - 1] = '\0';
+  }
+
+  for (size_t i = 0; i < strlen(cleanPath); i++) {
+    if (cleanPath[i] == '\\') {
+      cleanPath[i] = '/';
     }
   }
-}
 
-// Builds the list of emotion folders found under EMOTIONS_DIR.
-void loadEmotionList() {
-  emotionCount = loadSubfolderList(EMOTIONS_DIR, emotionNames, MAX_FOLDERS);
-}
-
-// Returns a random frame folder from the list built by loadFolderList(), or nullptr if none exist.
-const char *getRandomFolder() {
-  if (folderCount == 0) {
+  int count = loadSubfolderList(cleanPath, subfolders, MAX_FOLDERS);
+  if (count == 0) {
     return nullptr;
   }
-  return folderNames[random(0, folderCount)];
-}
 
-// Returns a random emotion folder from the list built by loadEmotionList(), or nullptr if none exist.
-const char *getRandomEmotion() {
-  if (emotionCount == 0) {
-    return nullptr;
-  }
-  return emotionNames[random(0, emotionCount)];
+  int idx = random(0, count);
+  strncpy(selectedFolder, subfolders[idx], sizeof(selectedFolder) - 1);
+  selectedFolder[sizeof(selectedFolder) - 1] = '\0';
+  return selectedFolder;
 }
 
 // Loads and draws every BMP frame in folderPath, in alphabetical order, once.
@@ -298,20 +295,16 @@ void setup() {
     Serial.println(F("LittleFS mount failed"));
     return;
   }
-
-  loadFolderList();
-  loadEmotionList();
 }
 
 void loop() {
-  const char *folder = getRandomFolder();
-  if (folder) {
-    drawFrames(folder);
+  const char *movement = getRandomEyeMovement(EYE_MOVEMENT_DIR);
+  if (movement) {
+    drawFrames(movement);
     delay(random(100, 6000)); // Random delay between .1 and 6 seconds
   }
 
-
-  const char *emotion = getRandomEmotion();
+  const char *emotion = getRandomEyeMovement(EMOTIONS_DIR);
   if (emotion) {
     drawFrames(emotion);
     delay(random(100, 6000)); // Random delay between .1 and 6 seconds
